@@ -26,10 +26,15 @@
   .PARAMETER VHDNamePrefix
   VHDNamePrefix is used to identify the image, This can be anything. Required
 
+  .SWITCH NoAuth
+  When switch is present, script will skip prompting for Azure credential. Use this option only if you have already authenticated to Azure on this Powershell session.
+
 
   .NOTES
   File Name  : Create-V2VMImage.ps1
   Author     : Hannel Hazeley - hhazeley@outlook.com
+  Version    : 2.0
+  Requires   : Azure PowerShell 3.0 and higher
 
   .LINK
   https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-windows-capture-image/
@@ -47,26 +52,41 @@
     [Parameter(Mandatory=$true)]
     $VMName,
     [Parameter(Mandatory=$true)]
-    $VHDNamePrefix
+    $VHDNamePrefix,
+    [Switch]$NoAuth
    )
 
 
-#Login to Azure and select subscription
-Login-AzureRmAccount
-Select-AzureRmSubscription -SubscriptionId $SubscriptionId
+if ($NoAuth.IsPresent)
+{
+Write-Host ""
+Write-Host -ForegroundColor Yellow "Skipping Login in to Azure"
+Write-Host ""
+}
+Else
+{
+#Login into Azure
+Login-AzureRmAccount -ErrorAction Stop | Out-Null
+}
+
+#Selecting subscription
+Select-AzureRmSubscription -SubscriptionId $SubscriptionId -ErrorAction Stop
 
 #Stop VM 
-Stop-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -Force
+Stop-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -Force -Verbose -ErrorAction Stop
 
 #Generalize VM and confirm status
-Set-AzureRmVm -ResourceGroupName $ResourceGroupName -Name $VMName -Generalized
+Set-AzureRmVm -ResourceGroupName $ResourceGroupName -Name $VMName -Generalized | Out-Null
 $vm = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -status
 $vm.Statuses
 
 #Create Azure VM Image 
-Save-AzureRmVMImage -ResourceGroupName $ResourceGroupName -VMName $VMName -DestinationContainerName $ResourceGroupName.ToLower() -VHDNamePrefix $VHDNamePrefix
+Save-AzureRmVMImage -ResourceGroupName $ResourceGroupName -VMName $VMName -DestinationContainerName $VHDNamePrefix.ToLower() -VHDNamePrefix $VHDNamePrefix.ToLower() -ErrorAction Stop | Out-Null
 
 #Getting Image VHD URI
+Write-Host ""
+Write-Host -ForegroundColor Green "VHD image created from virtual machine $vmname."
+Write-Host ""
 $SA  = Get-AzureRmStorageAccount -Name $StorageAccountName -ResourceGroupName $ResourceGroupName
 $image = ($SA | Get-AzureStorageBlob -Container "system").Name | ?{$_ -like "*$VHDNamePrefix-osDisk*.vhd"}
 $imageURI = "https://$StorageAccountName.blob.core.windows.net/system/$Image"
