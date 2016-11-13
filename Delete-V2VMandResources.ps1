@@ -28,11 +28,18 @@
 
   .PARAMETER VMNames
   The name or names of the virtual machine(s) to be deleted. Required
+  
+  .SWITCH DeleteDisks
+  When switch is present, script will delete disk attached to virtual machine. DELETING OF DISK MEANS THERE IS A POTENTIAL FOR DATA LOSS, USE AT YOUR OWN RISK.
 
+  .SWITCH NoAuth
+  When switch is present, script will skip prompting for Azure credential. Use this option only if you have already authenticated to Azure on this Powershell session.
 
   .NOTES
   File Name  : Delete-V2VMandResources.ps1
   Author     : Hannel Hazeley - hhazeley@outlook.com
+  Version    : 2.0
+  Requires   : Azure PowerShell 3.0 and higher
 
   .LINK
   https://???????//
@@ -47,23 +54,35 @@ Param (
     $ResourceGroupName,
     [Parameter(Mandatory=$true)]
     $VMNames, 
-    [Switch]$DeleteDisks
+    [Switch]$DeleteDisks,
+    [Switch]$NoAuth
 )
 
-#Login and and select subscription
-Login-AzureRmAccount
-Select-AzureRmSubscription -SubscriptionId $SubscriptionId
+if ($NoAuth.IsPresent)
+{
+Write-Host ""
+Write-Host -ForegroundColor Yellow "Skipping Login in to Azure"
+Write-Host ""
+}
+Else
+{
+#Login into Azure
+Login-AzureRmAccount | Out-Null
+}
+
+#Selecting subscription
+Select-AzureRmSubscription -SubscriptionId $SubscriptionId -ErrorAction Stop
 
 foreach ($vmname in $vmnames)
 {
 #stop VM 
-Stop-AzureRmVM -Name $vmname -ResourceGroupName $ResourceGroupName -Force
+Stop-AzureRmVM -Name $vmname -ResourceGroupName $ResourceGroupName -Force | Out-Null
 
 #Get details of VM
 $vm = get-azurermvm -ResourceGroupName $ResourceGroupName -Name $vmname
 
 #Deleted VM 
-Remove-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $vmname -Force
+Remove-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $vmname -Force -Verbose
 
 #Use VM deatils to identify and delete network resources, NIC and PIP
 $nics = $vm.NetworkInterfaceIDs
@@ -88,13 +107,16 @@ $DataDisks = $vm.StorageProfile.DataDisks
 $DataDisks | % {
 $vhduri = $_.Vhd.Uri
 $SA = Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -name ($VHDuri).Split('/')[2].Split('.')[0] 
-$SA | Remove-AzureStorageBlob -Blob ($VHDuri).Split('/')[-1] -Container ($VHDuri).Split('/')[-2]
+$SA | Remove-AzureStorageBlob -Blob ($VHDuri).Split('/')[-1] -Container ($VHDuri).Split('/')[-2] -Force -Verbose
 }
 
 #Use VM deatils to identify and delete data disk 
 $osDisk = $vm.StorageProfile.OsDisk
 $vhduri = $Osdisk.Vhd.Uri
 $SA = Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -name ($VHDuri).Split('/')[2].Split('.')[0] 
-$SA | Remove-AzureStorageBlob -Blob ($VHDuri).Split('/')[-1] -Container ($VHDuri).Split('/')[-2]
+$SA | Remove-AzureStorageBlob -Blob ($VHDuri).Split('/')[-1] -Container ($VHDuri).Split('/')[-2] -Force -Verbose
 }
+Write-Host ""
+Write-Host -ForegroundColor Green "Clean-up for $vmname completed."
+Write-Host ""
 }
