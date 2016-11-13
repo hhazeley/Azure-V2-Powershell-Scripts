@@ -47,9 +47,14 @@
   .PARAMETER NSGName
   Specify a NIC NSG that you will like machine to be on. If not specified a Windows default NSG will be used/created automatically.
 
+  .SWITCH NoAuth
+  When switch is present, script will skip prompting for Azure credential. Use this option only if you have already authenticated to Azure on this Powershell session.
+
   .NOTES
   File Name  : Create-V2VMFromImage.ps1
   Author     : Hannel Hazeley - hhazeley@outlook.com
+  Version    : 2.0
+  Requires   : Azure PowerShell 3.0 and higher
 
   .LINK
   https://???????//
@@ -57,26 +62,38 @@
   #>
 
  Param(
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $SubscriptionId,
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $ResourceGroupName,
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $VHDNamePrefix,
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $StorageAccName,
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $VmSize,
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $NewvmNames,
-    [Parameter(Mandatory=$true)]
+    #[Parameter(Mandatory=$true)]
     $VNetName,
     $SubNetName,
-    $NSGName
+    $NSGName,
+    [Switch]$NoAuth
    )
 
-#Login to Azure and select subscription
-Login-AzureRmAccount
+if ($NoAuth.IsPresent)
+{
+Write-Host ""
+Write-Host -ForegroundColor Yellow "Skipping Login in to Azure"
+Write-Host ""
+}
+Else
+{
+#Login into Azure
+Login-AzureRmAccount | Out-Null
+}
+
+#Selecting subscription
 Select-AzureRmSubscription -SubscriptionId $SubscriptionId -ErrorAction Stop
 
 #Get the storage account where the uploaded image is stored
@@ -168,17 +185,17 @@ $cred = Get-Credential -Message "Username and Password for you new Virtual Machi
 Foreach ($NewvmName in $Newvmnames)
 {
 #Set the VM name and size
-#Use "Get-Help New-AzureRmVMConfig" to know the available options for -VMsize
 $vmConfig = New-AzureRmVMConfig -VMName $NewvmName -VMSize $VmSize
 
 #Set the Windows operating system configuration and add the NIC
 $vm = Set-AzureRmVMOperatingSystem -VM $vmConfig -Windows -ComputerName $NewvmName -Credential $cred -ProvisionVMAgent -EnableAutoUpdate
 
+#Create a random 3 digit number
 $rnum = Get-Random -Minimum 100 -Maximum 999
 
 #Creating Public IP
-$ipName = $NewvmName.ToLower() + $rnum
-$pip = New-AzureRmPublicIpAddress -Name $ipName -Location $Location -ResourceGroupName $ResourceGroupName -AllocationMethod Dynamic -DomainNameLabel $NewvmName.ToLower()
+$pipName = $NewvmName.ToLower() + $rnum
+$pip = New-AzureRmPublicIpAddress -Name $pipName -Location $Location -ResourceGroupName $ResourceGroupName -AllocationMethod Dynamic
 
 #Creating NIC 
 $nicName = $NewvmName.ToLower() + $rnum
@@ -188,16 +205,51 @@ $nic = New-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $ResourceGr
 $vm = Add-AzureRmVMNetworkInterface -VM $vm -Id $nic.Id
 
 #Create the OS disk URI
-$osDiskUri = '{0}vhds/{1}-{2}.vhd' -f $storageAcc.PrimaryEndpoints.Blob.ToString(), $NewvmName.ToLower(), $osDiskName
+$diskdate = Get-Date -Format "yyyyMMdd-HHmmss"
+$osDiskUri = '{0}vhds/{1}-{2}.vhd' -f $storageAcc.PrimaryEndpoints.Blob.ToString(), $NewvmName.ToLower(), "osDisk-$diskdate"
 
-#Getting Image from storage account using image VHDNamePrefix
+#Getting os disk image from storage account using image VHDNamePrefix
 $Image = ($storageAcc | Get-AzureStorageBlob -Container "system").Name | ?{$_ -like "*$VHDNamePrefix-osDisk*.vhd"}
 $ImageURI = "https://$storageAccName.blob.core.windows.net/system/$Image"
 
-#Configure the OS disk to be created from the image (-CreateOption fromImage), and give the URL of the uploaded image VHD for the -SourceImageUri parameter
-#You set this variable when you uploaded the VHD
+#Configure the OS disk to be created from the image
 $vm = Set-AzureRmVMOSDisk -VM $vm -Name $NewvmName -VhdUri $osDiskUri -CreateOption fromImage -SourceImageUri $imageURI -Windows
 
+#Getting data disk image from storage account using image VHDNamePrefix
+$ImagedataDisks = ($storageAcc | Get-AzureStorageBlob -Container "system").Name | ?{$_ -like "*$VHDNamePrefix-dataDisk-*.vhd"}
+$DataDiskCount = 0
+
+#If multiple data disk created from image and attach to new VM
+Foreach ($Imagedatadisk in $ImagedataDisks)
+{
+#Create the OS disk URI
+$diskdate = Get-Date -Format "yyyyMMdd-HHmmss"
+$dataDiskUri = '{0}vhds/{1}-{2}.vhd' -f $storageAcc.PrimaryEndpoints.Blob.ToString(), $NewvmName.ToLower(), "dataDisk-$DataDiskCount-$diskdate"
+
+#Configure the OS disk to be created from the image
+$DataImageURI = "https://$storageAccName.blob.core.windows.net/system/$Imagedatadisk"
+$DataDiskSize = ($storageAcc | Get-AzureStorageBlob -Blob $Imagedatadisk -Container "system").Length |% {[math]::Truncate($_ / 1GB)}
+$vm = Add-AzureRmVMDataDisk -CreateOption fromImage -Name "$NewvmName-DataDisk-$DataDiskCount-$diskdate" -VhdUri $dataDiskUri -VM $VM -SourceImageUri $DataImageURI -DiskSizeInGB $DataDiskSize -Lun $DataDiskCount
+$DataDiskCount = $DataDiskCount + 1
+}
+
 #Create the new VM
-New-AzureRmVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $vm
+New-AzureRmVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $vm -Verbose -ErrorVariable VMNotCreated
+
+#If VM creation fails, deleted resources already created.
+if($VMNotCreated -ne $null)
+{
+Remove-AzureRmNetworkInterface -Name "$nicname" -ResourceGroupName $ResourceGroupName -Force -Verbose
+Remove-AzureRmPublicIpAddress -Name "$pipName" -ResourceGroupName $ResourceGroupName -Force -Verbose
+Write-Host ""
+Write-Host -ForegroundColor Red "Deployment of Virtual Machine $NewvmName failed."
+Write-Host ""
+}
+Else
+{
+Write-Host ""
+Write-Host -ForegroundColor Green "Deployment of Virtual Machine $NewvmName completed."
+Write-Host ""
+}
+
 }
