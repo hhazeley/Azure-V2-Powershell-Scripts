@@ -62,19 +62,19 @@
   #>
 
  Param(
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $SubscriptionId,
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $ResourceGroupName,
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $VHDNamePrefix,
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $StorageAccName,
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $VmSize,
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $NewvmNames,
-    #[Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$true)]
     $VNetName,
     $SubNetName,
     $NSGName,
