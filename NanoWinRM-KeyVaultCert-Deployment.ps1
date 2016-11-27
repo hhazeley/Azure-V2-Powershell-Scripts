@@ -74,7 +74,7 @@ Update-AzureRmVM -VM $VM -ResourceGroupName $rgName -ErrorAction Stop -Verbose
 
 #Updating FireWall and WinRM using Custom Script extension
 $args = "$DNSLabel $Thumbprint"
-Set-AzureRmVMCustomScriptExtension -ResourceGroupName $rgName -VMName $vmName -Argument $args -FileUri https://hazelnestpublicstore.blob.core.windows.net/public/WinRMHTTPS-FC-Set.ps1 -Location westus -Name WinRMHTTPS-FC-Set -Run WinRMHTTPS-FC-Set.ps1 -ErrorAction Stop -Verbose
+Set-AzureRmVMCustomScriptExtension -ResourceGroupName $rgName -VMName $vmName -Argument $args -FileUri https://hazelnestpublicstore.blob.core.windows.net/public/WinRMHTTPS-FC-Set.ps1 -Location $VM.Location -Name WinRMHTTPS-FC-Set -Run WinRMHTTPS-FC-Set.ps1 -ErrorAction Stop -Verbose
 
 #Cleanup
 $VM = Get-AzureRmVM -ResourceGroupName $rgName -Name $vmName -ErrorAction Stop
