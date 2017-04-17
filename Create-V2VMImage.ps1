@@ -3,18 +3,18 @@
   Creates V2 Virtual machine image 
   
   .DESCRIPTION
-  This script will generalize virtual machine and creates image from a viurtual machine that should have been sysperep.  
+  This script will generalize virtual machine and creates image from a virtual machine that should have been sysprep.  
   Please remember after running this script you can no longer use virtual machine as it will b e in a generalize state. 
   
   .EXAMPLE
-  Create-V2VMImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -ResourceGroupName DVideoRG1 -StorageAccountName DVStore1 -VMName DV1-DPBIMG-001 -VHDNamePrefix DVImage
+  Create-V2VMImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -rgName DVideoRG1 -StorageAccountName DVStore1 -VMName DV1-DPBIMG-001 -VHDNamePrefix DVImage
 
   Generalize virtual machine and creates and image of machine to be used for later deployment. 
       
   .PARAMETER SubscriptionId
   Subscription ID for the subscription that virtual machine is on. Required
     
-  .PARAMETER ResourceGroupName
+  .PARAMETER rgName
   The Resource Group the virtual machine belongs to. Required
 
   .PARAMETER StorageAccountName
@@ -46,7 +46,7 @@
     [Parameter(Mandatory=$true)]
     $SubscriptionId,
     [Parameter(Mandatory=$true)]
-    $ResourceGroupName,
+    $rgName,
     [Parameter(Mandatory=$true)]
     $StorageAccountName,
     [Parameter(Mandatory=$true)]
@@ -73,21 +73,21 @@ Login-AzureRmAccount -ErrorAction Stop | Out-Null
 Select-AzureRmSubscription -SubscriptionId $SubscriptionId -ErrorAction Stop
 
 #Stop VM 
-Stop-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -Force -Verbose -ErrorAction Stop
+Stop-AzureRmVM -ResourceGroupName $rgName -Name $VMName -Force -Verbose -ErrorAction Stop
 
 #Generalize VM and confirm status
-Set-AzureRmVm -ResourceGroupName $ResourceGroupName -Name $VMName -Generalized | Out-Null
-$vm = Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Name $VMName -status
+Set-AzureRmVm -ResourceGroupName $rgName -Name $VMName -Generalized | Out-Null
+$vm = Get-AzureRmVM -ResourceGroupName $rgName -Name $VMName -status
 $vm.Statuses
 
 #Create Azure VM Image 
-Save-AzureRmVMImage -ResourceGroupName $ResourceGroupName -VMName $VMName -DestinationContainerName $VHDNamePrefix.ToLower() -VHDNamePrefix $VHDNamePrefix.ToLower() -ErrorAction Stop | Out-Null
+Save-AzureRmVMImage -ResourceGroupName $rgName -VMName $VMName -DestinationContainerName $VHDNamePrefix.ToLower() -VHDNamePrefix $VHDNamePrefix.ToLower() -ErrorAction Stop | Out-Null
 
 #Getting Image VHD URI
 Write-Host ""
 Write-Host -ForegroundColor Green "VHD image created from virtual machine $vmname."
 Write-Host ""
-$SA  = Get-AzureRmStorageAccount -Name $StorageAccountName -ResourceGroupName $ResourceGroupName
+$SA  = Get-AzureRmStorageAccount -Name $StorageAccountName -ResourceGroupName $rgName
 $image = ($SA | Get-AzureStorageBlob -Container "system").Name | ?{$_ -like "*$VHDNamePrefix-osDisk*.vhd"}
 $imageURI = "https://$StorageAccountName.blob.core.windows.net/system/$Image"
 

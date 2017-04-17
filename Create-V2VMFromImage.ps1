@@ -6,24 +6,24 @@
   This script will use Image created by the Save-AzureRMImage cmdlet to do deployment of a single or numerous virtual machines. Before running this script Resource Group, Storage Account and Virtual Netowrk should have been created.
   
   .EXAMPLE
-  Create-V2VMFromImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -ResourceGroupName DVideoRG1 -VHDNamePrefix Dvideo -storageAccName dvideostore1 -VmSize Basic_A1 -NewvmNames "DV1-DPBSV1-001" -VNetName DVideoVNet1
+  Create-V2VMFromImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -rgName DVideoRG1 -VHDNamePrefix Dvideo -storageAccName dvideostore1 -VmSize Basic_A1 -NewvmNames "DV1-DPBSV1-001" -VNetName DVideoVNet1
 
-  This will create virtual machine, use/create default NSG and use deafult VNet subnet
+  This will create virtual machine, use/create default NSG and use default VNet subnet
       
   .EXAMPLE
-  Create-V2VMFromImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -ResourceGroupName DVideoRG1 -VHDNamePrefix Dvideo -storageAccName dvideostore1 -VmSize Basic_A1 -NewvmNames "DV1-DPBSV1-001","DV1-DPBSV1-002" -VNetName DVideoVNet1
+  Create-V2VMFromImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -rgName DVideoRG1 -VHDNamePrefix Dvideo -storageAccName dvideostore1 -VmSize Basic_A1 -NewvmNames "DV1-DPBSV1-001","DV1-DPBSV1-002" -VNetName DVideoVNet1
 
-  This will create 2 virtual machine, use/create default NSG and use deafult VNet subnet
+  This will create 2 virtual machine, use/create default NSG and use default VNet subnet
     
   .EXAMPLE
-  Create-V2VMFromImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -ResourceGroupName DVideoRG1 -VHDNamePrefix Dvideo -storageAccName dvideostore1 -VmSize Basic_A1 -NewvmNames "DV1-DPBSV1-001" -VNetName DVideoVNet1 -SubNetName DVideoVNet1-S1 -NSGName InternalOnly
+  Create-V2VMFromImage.ps1 -SubscriptionId 1d6737e7-4f6c-4e3c-8cd4-996b6f003d0e -rgName DVideoRG1 -VHDNamePrefix Dvideo -storageAccName dvideostore1 -VmSize Basic_A1 -NewvmNames "DV1-DPBSV1-001" -VNetName DVideoVNet1 -SubNetName DVideoVNet1-S1 -NSGName InternalOnly
 
   This will create virtual machine on a specific subnet and NSG
       
   .PARAMETER SubscriptionId
   Subscription ID for the subscription that virtual machine is on. Required
     
-  .PARAMETER ResourceGroupName
+  .PARAMETER rgName
   Resource Group the virtual machine belongs to. Required
 
   .PARAMETER VHDNamePrefix
@@ -65,7 +65,7 @@
     [Parameter(Mandatory=$true)]
     $SubscriptionId,
     [Parameter(Mandatory=$true)]
-    $ResourceGroupName,
+    $rgName,
     [Parameter(Mandatory=$true)]
     $VHDNamePrefix,
     [Parameter(Mandatory=$true)]
@@ -97,10 +97,10 @@ Login-AzureRmAccount | Out-Null
 Select-AzureRmSubscription -SubscriptionId $SubscriptionId -ErrorAction Stop
 
 #Get the storage account where the uploaded image is stored
-$storageAcc = Get-AzureRmStorageAccount -ResourceGroupName $ResourceGroupName -AccountName $storageAccName -ErrorAction Stop
+$storageAcc = Get-AzureRmStorageAccount -ResourceGroupName $rgName -AccountName $storageAccName -ErrorAction Stop
 
-#Gertting Location from resource group
-$Location = (Get-AzureRmResourceGroup -Name $ResourceGroupName).location
+#Getting Location from resource group
+$Location = (Get-AzureRmResourceGroup -Name $rgName).location
 
 #Getting and validating VM Size provided 
 $VVMsizes = (Get-AzureRmVMSize -Location $Location).Name
@@ -113,18 +113,18 @@ Break
 }
 
 #Getting existing VNet in resource group
-$VVNet = (Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroupName).name
+$VVNet = (Get-AzureRmVirtualNetwork -ResourceGroupName $rgName).name
 If ($VVnet -notcontains $VNetName)
 {
 Write-Host ""
-Write-Host -ForegroundColor Red "VNet Name is invalid, you must use an exisiting VNet Name"
+Write-Host -ForegroundColor Red "VNet Name is invalid, you must use an existing VNet Name"
 Write-Host ""
 Break
 }
 Else 
 {
 #Setting VNet to existing VNet
-$VNet = Get-AzureRmVirtualNetwork -ResourceGroupName $ResourceGroupName -Name $VNetName
+$VNet = Get-AzureRmVirtualNetwork -ResourceGroupName $rgName -Name $VNetName
 If ($SubNetName -eq $null)
 {
 #Putting server in 1st subnet since no specified
@@ -136,20 +136,20 @@ Else
 If ($VNet.Subnets.name -notcontains $SubNetName)
 {
 Write-Host ""
-Write-Host -ForegroundColor Red "SubNet Name is invalid, you must use an exisiting SubNet Name or leave it blank to use default subnet"
+Write-Host -ForegroundColor Red "SubNet Name is invalid, you must use an existing SubNet Name or leave it blank to use default subnet"
 Write-Host ""
 Break
 }
 Else
 {
-#Getting exsisting Subnet
+#Getting existing Subnet
 $SubNet = Get-AzureRmVirtualNetworkSubnetConfig -VirtualNetwork $VNet -Name $SubnetName
 }
 }
 }
 
 #Getting existing NSG in resource group
-$VNetworkSecurityGroup = (Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroupName).Name
+$VNetworkSecurityGroup = (Get-AzureRmNetworkSecurityGroup -ResourceGroupName $rgName).Name
 If ($NSGName -eq $null)
 {
 #Validating Default NSG exists 
@@ -157,10 +157,10 @@ If ($VNetworkSecurityGroup -notcontains "WindowsServer-Default")
 {
 #Creating Default Windows NSG
 $NSGRule = New-AzureRmNetworkSecurityRuleConfig -Name default-allow-rdp -Access Allow -Description "Allowing RDP connection" -DestinationAddressPrefix * -DestinationPortRange 3389 -Direction Inbound -Priority 1000 -Protocol Tcp -SourceAddressPrefix * -SourcePortRange *
-New-AzureRmNetworkSecurityGroup -Location $location -Name WindowsServer-Default -ResourceGroupName $ResourceGroupName -SecurityRules $NSGRule
+New-AzureRmNetworkSecurityGroup -Location $location -Name WindowsServer-Default -ResourceGroupName $rgName -SecurityRules $NSGRule
 }
 #Setting NSG to windows default NSG, since its not provided
-$nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroupName -Name WindowsServer-Default
+$nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $rgName -Name WindowsServer-Default
 }
 Else
 {
@@ -168,14 +168,14 @@ Else
 If ($VNetworkSecurityGroup -notcontains $NSGName)
 {
 Write-Host ""
-Write-Host -ForegroundColor Red "Network Security Group (NSG) is invalid, you must use an exisiting NSG or leave it blank to use\Create default Windows NSG"
+Write-Host -ForegroundColor Red "Network Security Group (NSG) is invalid, you must use an existing NSG or leave it blank to use\Create default Windows NSG"
 Write-Host ""
 Break
 }
 Else
 {
 #Setting NSG to NSG name provided
-$nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $ResourceGroupName -Name $NSGName
+$nsg = Get-AzureRmNetworkSecurityGroup -ResourceGroupName $rgName -Name $NSGName
 }
 }
 
@@ -195,11 +195,11 @@ $rnum = Get-Random -Minimum 100 -Maximum 999
 
 #Creating Public IP
 $pipName = $NewvmName.ToLower() + $rnum
-$pip = New-AzureRmPublicIpAddress -Name $pipName -Location $Location -ResourceGroupName $ResourceGroupName -AllocationMethod Dynamic
+$pip = New-AzureRmPublicIpAddress -Name $pipName -Location $Location -ResourceGroupName $rgName -AllocationMethod Dynamic
 
 #Creating NIC 
 $nicName = $NewvmName.ToLower() + $rnum
-$nic = New-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $ResourceGroupName -Location $Location -PublicIpAddress $pip -Subnet $SubNet -NetworkSecurityGroup $nsg
+$nic = New-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $rgName -Location $Location -PublicIpAddress $pip -Subnet $SubNet -NetworkSecurityGroup $nsg
 
 #Adding NIC to VM variable 
 $vm = Add-AzureRmVMNetworkInterface -VM $vm -Id $nic.Id
@@ -234,13 +234,13 @@ $DataDiskCount = $DataDiskCount + 1
 }
 
 #Create the new VM
-New-AzureRmVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $vm -Verbose -ErrorVariable VMNotCreated
+New-AzureRmVM -ResourceGroupName $rgName -Location $Location -VM $vm -Verbose -ErrorVariable VMNotCreated
 
 #If VM creation fails, deleted resources already created.
 if($VMNotCreated -ne $null)
 {
-Remove-AzureRmNetworkInterface -Name "$nicname" -ResourceGroupName $ResourceGroupName -Force -Verbose
-Remove-AzureRmPublicIpAddress -Name "$pipName" -ResourceGroupName $ResourceGroupName -Force -Verbose
+Remove-AzureRmNetworkInterface -Name "$nicname" -ResourceGroupName $rgName -Force -Verbose
+Remove-AzureRmPublicIpAddress -Name "$pipName" -ResourceGroupName $rgName -Force -Verbose
 Write-Host ""
 Write-Host -ForegroundColor Red "Deployment of Virtual Machine $NewvmName failed."
 Write-Host ""
@@ -251,5 +251,4 @@ Write-Host ""
 Write-Host -ForegroundColor Green "Deployment of Virtual Machine $NewvmName completed."
 Write-Host ""
 }
-
 }
