@@ -73,7 +73,7 @@ Write-host -ForegroundColor Red "ERROR: " -NoNewline
 Write-Host -ForegroundColor Red $errorck
 Write-Host
 Write-Host "______________________________________________________________________"
-Write-Host -ForegroundColor Red "Script aborted and actions rolled back, see above error."
+Write-Host -ForegroundColor Red "Script aborted, see above error. Perform rollback actions if needed."
 Write-Host "______________________________________________________________________"
 Write-Host
 Break
@@ -112,7 +112,7 @@ ErrorCheck
 }
 Else
 {
-Write-Host -ForegroundColor Green "Application '$aadAppName' found, adding key to existing application"
+Write-Host -ForegroundColor  Yellow -BackgroundColor Black "Application '$aadAppName' found, adding key to existing application"
 $azureAdApplication = $azureAdApplicationValidation
 $hout = New-AzureRmADAppCredential -ApplicationId $azureAdApplication.ApplicationId.Guid -Password $aadClientSecret -ErrorVariable errorck
 ErrorCheck
@@ -158,7 +158,7 @@ ErrorCheck
 Else
 {
 Write-Host -ForegroundColor  Yellow -BackgroundColor Black "Key Vault '$vaultName' found, vaultrgName and Location supplied will be ignored"
-Write-Host -ForegroundColor Green "Updating permissions on Key Vault '$vaultName'"
+Write-Host -ForegroundColor  Yellow -BackgroundColor Black "Updating permissions on Key Vault '$vaultName'"
 $VaultrgName = $vaultNameValidation.ResourceGroupName
 Set-AzureRmKeyVaultAccessPolicy -UserPrincipalName $UPN  -VaultName $vaultname -PermissionsToCertificates all -PermissionsToKeys all -PermissionsToSecrets all -ResourceGroupName $VaultrgName -ErrorAction stop | Out-Null
 Set-AzureRmKeyVaultAccessPolicy -VaultName $VaultName -ServicePrincipalName $azureAdApplication.ApplicationId -PermissionsToKeys 'WrapKey' -PermissionsToSecrets 'Set' -ResourceGroupName $VaultrgName -ErrorAction stop | Out-Null
@@ -181,9 +181,9 @@ $Suffix = Get-Date -Format yyyyMMddHHmmss
 #Creating and uploading self-signed certificate to Azure Key Vault
 Write-Host -ForegroundColor Green "Creating Self-singed certificate"
 $certName = $uPrefix+"-"+$Suffix+'.pfx'
-$Cert = New-SelfSignedCertificate -Subject "CN=Disk Encryption Cert"  -CertStoreLocation "cert:\LocalMachine\My" -FriendlyName "$vaultName - Disk Encryption Cert" -NotAfter (Get-Date).AddMonths(60) -KeyAlgorithm RSA -KeyLength 2048 -Type Custom
-$hout = Export-PfxCertificate -Cert $cert -Password $password -FilePath .\$certName -Force -ErrorVariable errorck
+$Cert = New-SelfSignedCertificate -Subject "CN=Disk Encryption Cert"  -CertStoreLocation "cert:\LocalMachine\My" -FriendlyName "$vaultName - Disk Encryption Cert" -NotAfter (Get-Date).AddMonths(60) -KeyAlgorithm RSA -KeyLength 2048 -Type Custom -ErrorVariable errorck
 ErrorCheck
+$hout = Export-PfxCertificate -Cert $cert -Password $password -FilePath .\$certName -Force
 
 $certLocalPath = (Dir | ? {$_.Name -eq $certName}).FullName
 $SecretName = $uPrefix+'-secret-'+$Suffix
