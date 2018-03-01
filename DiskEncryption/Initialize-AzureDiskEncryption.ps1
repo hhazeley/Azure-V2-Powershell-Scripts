@@ -97,7 +97,7 @@ Write-Host
 $password = Read-Host -assecurestring "Enter Password for certificate and App Secret"
 $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
 $UnsecurePassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-$aadClientSecret = $UnsecurePassword
+$aadClientSecret = $password
 
 #heck for and/or creating AAD Application 
 Write-Host -ForegroundColor Green "Checking for application '$aadAppName'"
